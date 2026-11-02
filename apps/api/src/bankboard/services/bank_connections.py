@@ -26,6 +26,23 @@ class AuthorizationError(Exception):
     pass
 
 
+def _resolve_institution(provider: BankingProvider, name: str, country: str) -> Institution:
+    """Use the provider's exact institution name and consent limit when the catalog is reachable.
+
+    Banks reject a consent longer than they support (Revolut: often 90 days), and the name must match
+    the provider catalog exactly. Falls back to the requested values if the catalog can't be read.
+    """
+    try:
+        catalog = provider.list_institutions(country)
+    except ProviderError:
+        return Institution(name=name, country=country)
+    wanted = name.casefold().strip()
+    for inst in catalog:
+        if inst.name.casefold().strip() == wanted:
+            return inst
+    return Institution(name=name, country=country)
+
+
 def start_connection(
     session: Session, *, user_id: uuid.UUID, provider_key: str, institution_name: str,
     institution_country: str, redirect_url: str, consent_days: int = DEFAULT_CONSENT_DAYS,
@@ -34,7 +51,9 @@ def start_connection(
     provider = provider or get_provider(provider_key)
     state = random_token(32)
     now = utcnow()
-    institution = Institution(name=institution_name, country=institution_country.upper())
+    institution = _resolve_institution(provider, institution_name, institution_country.upper())
+    if institution.max_consent_days:
+        consent_days = min(consent_days, institution.max_consent_days)
     start = provider.start_authorization(
         institution, state=state, redirect_url=redirect_url,
         valid_until=now + timedelta(days=consent_days),

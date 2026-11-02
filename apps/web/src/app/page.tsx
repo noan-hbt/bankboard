@@ -29,13 +29,14 @@ function NowStrip({ cc }: { cc: CommandCenter }) {
 
 function Onboarding({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const connect = async (provider: string) => {
-    setBusy(provider);
+    setBusy(provider); setError(null);
     try {
       const { url } = await api<{ url: string }>("/api/bank/connect", { method: "POST",
         json: { provider, institution_name: provider === "demo" ? "Revolut (démo)" : "Revolut", institution_country: "FR" } });
       window.location.href = url;
-    } catch (e) { setBusy(null); alert((e as Error).message); onDone(); }
+    } catch (e) { setBusy(null); setError((e as Error).message); onDone(); }
   };
   return (
     <div className="panel mx-auto mt-6 max-w-md p-6 text-center sm:mt-10">
@@ -47,6 +48,8 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         <button disabled={!!busy} onClick={() => void connect("demo")} className="rounded-[10px] border border-[var(--border)] py-2.5 disabled:opacity-50">
           {busy === "demo" ? "Préparation…" : "Essayer avec 12 mois de démo"}</button>
       </div>
+      {error && <p role="alert" className="mt-4 text-left text-xs leading-relaxed">
+        <span style={{ color: "var(--critical)" }}>▲ Connexion impossible.</span> {error}</p>}
     </div>
   );
 }
