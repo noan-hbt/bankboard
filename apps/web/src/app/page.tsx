@@ -1,7 +1,7 @@
 "use client";
 import { Pencil } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { DashboardGrid } from "@/components/DashboardGrid";
 import { Skeleton, Stat } from "@/components/ui";
@@ -30,6 +30,12 @@ function NowStrip({ cc }: { cc: CommandCenter }) {
 function Onboarding({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {  // back from the bank flow (Safari on iOS): reset the button and reload
+    const onVisible = () => { if (document.visibilityState === "visible") { setBusy(null); onDone(); } };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    return () => { document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("pageshow", onVisible); };
+  }, [onDone]);
   const connect = async (provider: string) => {
     setBusy(provider); setError(null);
     try {

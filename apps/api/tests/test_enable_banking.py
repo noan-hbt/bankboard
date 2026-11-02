@@ -172,6 +172,10 @@ def test_callback_state_validation(db: Session, user: User, other_user: User) ->
     req("good")
     conn = complete_connection(db, user_id=user.id, code="c", state="good", provider=stub)  # type: ignore[arg-type]
     assert conn.status == "active"
+    # Without a browser session the state alone identifies the user (iOS PWA -> Safari redirect).
+    req("cookieless")
+    assert complete_connection(db, user_id=None, code="c", state="cookieless",  # type: ignore[arg-type]
+                               provider=stub).user_id == user.id
     with pytest.raises(AuthorizationError, match="already used"):
         complete_connection(db, user_id=user.id, code="c", state="good", provider=stub)  # type: ignore[arg-type]
 
