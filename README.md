@@ -8,7 +8,7 @@ Cockpit financier personnel : jumeau financier, moteurs déterministes explicabl
 | [02 — Architecture](docs/02-architecture.md) | monorepo, couches, banking, pipeline, moteurs, modules, events, IA, PWA |
 | [03 — Modèle de données](docs/03-data-model.md) · [schéma SQL](apps/api/migrations/sql/0001_initial.sql) | |
 | [04 — Roadmap](docs/04-roadmap.md) | P0 → P3, dépendances, statut |
-| [05 — Déploiement Railway + PWA](docs/05-deployment-railway.md) | |
+| [05 — Déploiement Railway + PWA](docs/05-deployment-railway.md) | 1 service auto-détecté (Dockerfile racine), ou services séparés |
 
 ## Structure
 
