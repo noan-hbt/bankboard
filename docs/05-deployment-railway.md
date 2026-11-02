@@ -22,7 +22,8 @@
 1. **Projet Railway** → *New Project* → *Deploy from GitHub repo* (`bankboard`).
 2. **PostgreSQL** : *New* → *Database* → *PostgreSQL*.
 3. **Service `api`**
-   - Root directory : `apps/api` · config file : `apps/api/railway.json`
+   - Settings → Source → **Root Directory : `/apps/api`**
+   - Settings → Config-as-code → **Railway Config File : `/apps/api/railway.json`** (chemin absolu depuis la racine du repo : le fichier n'est pas cherché dans le Root Directory)
    - Pas de domaine public (réseau privé uniquement).
    - Variables :
      ```
@@ -42,13 +43,17 @@
      PORT=8000
      ```
    - Les migrations Alembic s'exécutent au démarrage (`alembic upgrade head`, idempotent).
-4. **Service `worker`** : même repo, root `apps/api`, config file `apps/api/railway.worker.json`, **mêmes variables** que `api` (Railway : *Shared variables*).
+4. **Service `worker`** : même repo, Root Directory `/apps/api`, Railway Config File `/apps/api/railway.worker.json`, **mêmes variables** que `api` (Railway : *Shared variables*).
 5. **Service `web`**
-   - Root directory : `apps/web` · config file : `apps/web/railway.json`
+   - Root Directory : `/apps/web` · Railway Config File : `/apps/web/railway.json`
    - *Generate domain* (c'est l'URL de l'app).
    - Variable : `BACKEND_URL=http://${{api.RAILWAY_PRIVATE_DOMAIN}}:8000`
 6. **Enable Banking** : dans le Control Panel, ajouter `https://<web>.up.railway.app/api/bank/callback` aux redirect URLs autorisées de l'application.
 7. **Premier compte** : ouvrir l'URL, *Créer un compte*, puis *Connecter Revolut* (ou *Données démo*).
+
+## Dépannage
+
+- **« Railpack could not determine how to build the app »** : le service build la racine du repo. Renseigner Root Directory + Railway Config File comme ci-dessus ; le log de build doit alors afficher « Using Dockerfile ».
 
 ## Installer la PWA sur le téléphone
 
