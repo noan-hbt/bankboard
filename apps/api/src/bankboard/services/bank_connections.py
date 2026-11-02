@@ -6,12 +6,22 @@ import contextlib
 import uuid
 from datetime import timedelta
 
-from sqlalchemy import select
+from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
 from bankboard.core.clock import utcnow
 from bankboard.core.crypto import encrypt, iban_hash, mask_iban, random_token, sha256_hex
-from bankboard.models import Account, BankAuthRequest, BankConnection, BankSession
+from bankboard.models import (
+    Account,
+    BankAuthRequest,
+    BankConnection,
+    BankSession,
+    ExpectedTransaction,
+    FeedItem,
+    FinancialSnapshot,
+    Insight,
+    RecurringPattern,
+)
 from bankboard.providers.base import BankingProvider, Institution, ProviderError, SessionRef
 from bankboard.providers.registry import get_provider
 from bankboard.services.audit import audit
@@ -141,3 +151,34 @@ def revoke_connection(session: Session, *, user_id: uuid.UUID, connection_id: uu
         bs.revoked_at = utcnow()
     connection.status = "revoked"
     audit(session, user_id, "bank.revoke", target=str(connection.id))
+
+
+def delete_connection(session: Session, *, user_id: uuid.UUID, connection_id: uuid.UUID) -> int:
+    """Revoke a connection and delete everything that came from it, then rebuild derived data.
+
+    Accounts are deleted (cascading to raw/normalized transactions and balances). Derived data
+    (recurring patterns, expected transactions, snapshots, insights, feed) is computed from all
+    accounts mixed together, so it is wiped and recomputed from what remains. User-authored data
+    (category rules, merchant corrections, goals, dashboard) is kept.
+    Returns the number of deleted accounts.
+    """
+    connection = session.get(BankConnection, connection_id)
+    if connection is None or connection.user_id != user_id:
+        raise LookupError("connection")
+    if connection.status != "revoked":
+        revoke_connection(session, user_id=user_id, connection_id=connection_id)
+    accounts = len(session.scalars(
+        delete(Account).where(Account.user_id == user_id, Account.connection_id == connection.id)
+        .returning(Account.id)
+    ).all())
+    for model in (ExpectedTransaction, RecurringPattern, FinancialSnapshot, Insight, FeedItem):
+        session.execute(delete(model).where(model.user_id == user_id))
+    session.execute(text("DELETE FROM recommendations WHERE user_id = :u"), {"u": user_id})
+    session.delete(connection)
+    audit(session, user_id, "bank.delete", target=str(connection_id), metadata={"accounts": accounts})
+    session.flush()
+
+    from bankboard.services.analysis import refresh_user  # local: analysis imports the whole engine stack
+
+    refresh_user(session, user_id)
+    return accounts

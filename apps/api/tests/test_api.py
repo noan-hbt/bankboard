@@ -137,3 +137,28 @@ def test_bank_callback_logged_in_redirects(client: TestClient) -> None:
     register(client)
     r = client.get(_start_demo_connect(client), follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].endswith("/settings?bank=connected")
+
+
+def test_delete_connection_removes_its_data_only(demo_client: TestClient) -> None:
+    demo = demo_client.get("/api/bank/connections").json()[0]
+    # A second ("real") connection whose data must survive.
+    demo_client.get(_start_demo_connect(demo_client), follow_redirects=False)
+    conns = demo_client.get("/api/bank/connections").json()
+    assert len(conns) == 2
+    accounts_before = demo_client.get("/api/accounts").json()
+
+    r = demo_client.delete(f"/api/bank/connections/{demo['id']}?delete_data=true", headers=ORIGIN)
+    assert r.status_code == 204, r.text
+    assert [c["id"] for c in demo_client.get("/api/bank/connections").json()] != [demo["id"]]
+    accounts_after = demo_client.get("/api/accounts").json()
+    assert 0 < len(accounts_after) < len(accounts_before)
+
+
+def test_delete_last_connection_empties_dashboard(demo_client: TestClient) -> None:
+    demo = demo_client.get("/api/bank/connections").json()[0]
+    assert demo_client.delete(f"/api/bank/connections/{demo['id']}?delete_data=true",
+                              headers=ORIGIN).status_code == 204
+    assert demo_client.get("/api/bank/connections").json() == []
+    assert demo_client.get("/api/accounts").json() == []
+    assert demo_client.get("/api/transactions").json()["total"] == 0
+    assert demo_client.get("/api/command-center").json()["has_data"] is False

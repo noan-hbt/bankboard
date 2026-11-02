@@ -20,6 +20,7 @@ from bankboard.providers.registry import available_providers, get_provider
 from bankboard.services.bank_connections import (
     AuthorizationError,
     complete_connection,
+    delete_connection,
     revoke_connection,
     start_connection,
 )
@@ -173,8 +174,14 @@ def sync(connection_id: uuid.UUID, user: CurrentUser, db: DB, background: Backgr
 
 
 @router.delete("/connections/{connection_id}", status_code=204)
-def revoke(connection_id: uuid.UUID, user: CurrentUser, db: DB) -> None:
+def revoke(connection_id: uuid.UUID, user: CurrentUser, db: DB,
+           delete_data: Annotated[bool, Query()] = False) -> None:
+    """Revoke the bank access. With `delete_data=true`, also delete the connection's accounts and
+    transactions and rebuild derived data (e.g. to remove the demo data)."""
     try:
-        revoke_connection(db, user_id=user.id, connection_id=connection_id)
+        if delete_data:
+            delete_connection(db, user_id=user.id, connection_id=connection_id)
+        else:
+            revoke_connection(db, user_id=user.id, connection_id=connection_id)
     except LookupError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND) from exc

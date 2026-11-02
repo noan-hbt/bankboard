@@ -1,5 +1,5 @@
 "use client";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
@@ -45,6 +45,17 @@ function Settings() {
       setConnecting(null);
     }
   };
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const removeConnection = async (c: Conn) => {
+    if (!confirm(`Supprimer « ${c.institution_name} » ? Ses comptes et toutes ses transactions seront effacés, et les indicateurs recalculés avec les autres banques.`)) return;
+    setDeleting(c.id);
+    try {
+      await api(`/api/bank/connections/${c.id}?delete_data=true`, { method: "DELETE" });
+      await Promise.all([mConns(), mAccs()]);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally { setDeleting(null); }
+  };
   const patchAccount = async (id: string, body: Partial<Acc>) => {
     await api(`/api/accounts/${id}`, { method: "PATCH", json: body }); await mAccs();
   };
@@ -63,7 +74,12 @@ function Settings() {
             <div className="flex gap-1">
               <button aria-label="Synchroniser" onClick={() => void api(`/api/bank/connections/${c.id}/sync`, { method: "POST" }).then(() => mConns())} className="rounded border border-[var(--border)] p-1.5"><RefreshCw size={14} /></button>
               {c.status === "reauth_required" && <button onClick={() => void connect(c.provider)} className="rounded border border-[var(--border)] px-2 text-xs">Reconnecter</button>}
-              <button onClick={() => confirm("Révoquer cette connexion ?") && void api(`/api/bank/connections/${c.id}`, { method: "DELETE" }).then(() => mConns())} className="rounded border border-[var(--border)] px-2 text-xs">Révoquer</button>
+              {c.status !== "revoked" && (
+                <button onClick={() => confirm("Révoquer l'accès à cette banque ? Les données déjà importées sont conservées.") && void api(`/api/bank/connections/${c.id}`, { method: "DELETE" }).then(() => mConns())} className="rounded border border-[var(--border)] px-2 text-xs">Révoquer</button>)}
+              <button aria-label="Supprimer la connexion et ses données" title="Supprimer la connexion et ses données"
+                disabled={deleting === c.id}
+                onClick={() => void removeConnection(c)}
+                className="rounded border border-[var(--border)] p-1.5 disabled:opacity-40" style={{ color: "var(--critical)" }}><Trash2 size={14} /></button>
             </div>
           </div>))}
         <div className="mt-3 flex flex-wrap gap-2">
