@@ -40,7 +40,7 @@ Développement **vertical** : chaque étape livre un incrément utilisable et te
 | 2 | Auth (register/login/logout, sessions cookie, Origin check) | tests auth | ✅ |
 | 3 | Schéma 0001 + modèles SQLAlchemy + Alembic | `alembic upgrade head` OK, tests sur base migrée | ✅ |
 | 4 | `BankingProvider`, DTO, `DemoProvider` + générateur 12 mois | démo seedée via le même chemin que EB | ✅ |
-| 5 | `EnableBankingProvider` (JWT RS256, aspsps, auth, sessions, comptes, soldes, transactions paginées), flux callback avec state | tests avec transport HTTP mocké | ✅ |
+| 5 | `EnableBankingProvider` (JWT RS256, aspsps, auth, sessions, comptes, soldes, transactions paginées), flux callback avec state | tests avec transport HTTP mocké | ✅ code + tests mockés — **à valider contre le sandbox Enable Banking réel** (nécessite tes identifiants) |
 | 6 | Sync idempotente (raw + projection + pending + balances + sync_jobs) | rejouer 3× = même état | ✅ |
 | 7 | Pipeline marchands / virements / classification | tests virements, remboursements, revenus, catégories, priorité manuelle | ✅ |
 | 8 | Récurrences + `expected_transactions` | tests cadence mensuelle/hebdo, salaire | ✅ |
@@ -49,9 +49,15 @@ Développement **vertical** : chaque étape livre un incrément utilisable et te
 | 11 | Snapshots quotidiens + backfill + Financial State Score explicable | tests | ✅ |
 | 12 | What Changed + détecteurs + insights dédupliqués | tests | ✅ |
 | 13 | API Command Center (NOW / NEXT / ATTENTION / OPPORTUNITIES) + widgets | tests API | ✅ |
-| 14 | Ask Your Money basique (LLMProvider, tools, mode offline) | tests tools | ✅ |
+| 14 | Ask Your Money basique (LLMProvider, OpenRouter, tools, mode offline, garde-fou sur les nombres) | tests tools | ✅ (OpenRouter testé avec transport mocké) |
 | 15 | Event outbox + CLI jobs + scheduler | tests | ✅ |
-| 16 | Frontend Next.js : Command Center en grille personnalisable, explorer, Data Health, connexion banque, Ask, ⌘K | build OK | ✅ |
+| 16 | Frontend Next.js PWA : Command Center en grille personnalisable, explorer, Data Health, connexion banque, Ask, ⌘K | build OK + parcours vérifié dans Chromium (desktop/mobile, clair/sombre) | ✅ |
+| 17 | Déploiement Railway (api, worker, web, Postgres) + CI GitHub Actions | Dockerfiles + config-as-code | ✅ fichiers prêts — images non construites dans cet environnement (pas de démon Docker) |
+
+### Prochaines étapes immédiates (avant P1)
+1. Brancher les vrais identifiants Enable Banking (sandbox puis production) et valider le flux Revolut de bout en bout.
+2. Déployer sur Railway, installer la PWA sur le téléphone.
+3. Passer 2-3 semaines d'usage réel : corriger les règles de classification / marchands sur tes données (c'est là que la qualité se joue).
 
 ## P1 — Intelligence (ordre conseillé)
 

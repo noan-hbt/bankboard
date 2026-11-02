@@ -186,16 +186,24 @@ class LLMProvider(Protocol):
     def complete(self, *, system: str, messages: list[ChatMessage],
                  tools: list[ToolSpec]) -> LLMResponse: ...
 ```
-- Implémentations : `AnthropicProvider` (HTTP, sans SDK imposé), `OfflineProvider` (routage par intention vers les tools, réponse templatée — sert aux tests et en l'absence de clé).
+- Implémentations : `OpenRouterProvider` (API compatible OpenAI `/chat/completions` + tool calls, clé `OPENROUTER_API_KEY` côté backend uniquement, modèle configurable `OPENROUTER_MODEL`, défaut `anthropic/claude-opus-5.5`) et `OfflineProvider` (routage par intention vers les tools, réponse templatée — sert aux tests, en l'absence de clé, et de repli automatique si OpenRouter est indisponible).
 - **Tools typés** (`ai/tools.py`) : `get_financial_state`, `query_transactions` (filtres, limite 50 lignes, agrégats), `query_metrics`, `compare_periods`, `get_predictions`, `get_insights`, `get_safe_to_spend`. Chaque tool retourne du JSON issu des moteurs.
 - Le prompt système interdit tout calcul : le modèle ne cite que des nombres présents dans les sorties de tools ; une vérification post-réponse signale les nombres absents des sorties (garde-fou).
 - Conversations persistées (`advisor_conversations`, `advisor_messages`, avec les appels de tools).
 
 ## 11. Frontend
 
-Next.js 15 (App Router) + TypeScript strict + Tailwind + ECharts + `react-grid-layout`. Composants style shadcn (Radix-free minimal en P0). Pages P0 : Command Center (grille de widgets persistée), Transactions (explorer), Data Health, Connexion bancaire, Ask. Palette ⌘K. Toutes les données viennent de l'API ; pas de calcul financier côté client.
+Next.js 15 (App Router) + TypeScript strict + Tailwind 4 + ECharts + `react-grid-layout`. Composants maison style shadcn. Pages P0 : Command Center (grille de widgets persistée, 1 colonne sur mobile), Transactions (explorer), Réglages (banques, comptes, modules, Data Health, suppression des données), Ask. Palette ⌘K. Toutes les données viennent de l'API ; pas de calcul financier côté client.
 
-## 12. Sécurité
+**PWA** : `manifest.webmanifest`, icônes, `sw.js` qui ne met en cache que le shell statique — **jamais** les réponses `/api/*` (données sensibles, toujours fraîches) — et une page hors ligne. Installable sur iOS/Android (« Ajouter à l'écran d'accueil »).
+
+**Proxy same-origin** : le navigateur ne parle qu'au service web ; la route `app/api/[...path]` relaie vers `BACKEND_URL` (réseau privé Railway). Conséquences : cookie de session first-party (`SameSite=Lax` fonctionne en PWA mobile), backend non exposé publiquement, URL de callback Enable Banking sur le domaine du front.
+
+## 12. Déploiement
+
+Railway : 4 services — PostgreSQL, `api` (FastAPI, migrations au démarrage), `worker` (même image, `python -m bankboard.jobs scheduler`), `web` (Next.js standalone, seul service public). Détails : [`05-deployment-railway.md`](05-deployment-railway.md).
+
+## 13. Sécurité
 
 - Secrets uniquement via variables d'environnement backend (`SecretStr`), `.env` ignoré par Git, `.env.example` sans valeurs.
 - `session_id` bancaire chiffré (Fernet, `APP_ENCRYPTION_KEY`).

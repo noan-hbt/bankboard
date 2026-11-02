@@ -10,7 +10,7 @@ import polars as pl
 from pydantic import BaseModel
 
 from bankboard.analytics.frames import between, spend_expr
-from bankboard.core.money import from_cents, q
+from bankboard.core.money import fmt_eur, from_cents, q
 from bankboard.engines.cashflow import compute_cashflow, month_bounds
 from bankboard.engines.common import DateSpan, ExplainLine, Explanation
 
@@ -152,13 +152,14 @@ def compare_periods(df: pl.DataFrame, current: DateSpan, previous: DateSpan,
         verb = "augmenté" if var_delta > 0 else "baissé"
         pct_txt = f" de {abs(var_pct) * 100:.0f} %" if var_pct is not None else ""
         headline = (f"Tes dépenses courantes ont {verb}{pct_txt} "
-                    f"({'+' if var_delta > 0 else '−'}{abs(from_cents(var_delta))} €)")
+                    f"({'+' if var_delta > 0 else '−'}{fmt_eur(abs(from_cents(var_delta)), 0)})")
         if cats and cats[0].share_of_change > 0:
             headline += f", surtout {cats[0].label.lower()} ({cats[0].share_of_change * 100:.0f} %)"
         headline += "."
 
     lines = [ExplainLine(label=f"{d.label}", amount=d.delta, op="+" if d.delta > 0 else "-",
-                         detail=f"{d.previous} → {d.current} € · {d.share_of_change * 100:.0f} % de la variation")
+                         detail=f"{fmt_eur(d.previous)} → {fmt_eur(d.current)} · "
+                                f"{d.share_of_change * 100:.0f} % de la variation")
              for d in cats[:5]]
     if rec_delta:
         lines.append(ExplainLine(label="Récurrents (effet calendrier inclus)", amount=from_cents(rec_delta),
@@ -229,4 +230,4 @@ def net_worth_change(df: pl.DataFrame, start: date, end: date, start_value: Deci
     verb = "augmenté" if change >= 0 else "baissé"
     return NetWorthChange(start=start, end=end, start_value=q(start_value), end_value=q(end_value), change=change,
                           flows=flows, unexplained=unexplained,
-                          headline=f"Ton patrimoine a {verb} de {abs(change)} €.")
+                          headline=f"Ton patrimoine a {verb} de {fmt_eur(abs(change))}.")

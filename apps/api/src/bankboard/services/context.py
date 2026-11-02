@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from bankboard.analytics.daily import DailySeries
 from bankboard.analytics.frames import load_transactions
-from bankboard.core.money import q
+from bankboard.core.money import fmt_eur, q
 from bankboard.engines.cashflow import average_daily_spend, month_bounds
 from bankboard.engines.safe_to_spend import ExpectedItem, GoalCommitment, SafeToSpendInputs
 from bankboard.engines.state_score import StateInputs
@@ -136,7 +136,7 @@ class FinancialContext:
         if self.prefs and self.prefs.min_buffer is not None:
             return q(self.prefs.min_buffer), "défini par toi"
         essential = self.essential_monthly()
-        return q(essential * Decimal("0.5")), f"50 % des dépenses essentielles mensuelles ({essential} €)"
+        return q(essential * Decimal("0.5")), f"50 % des dépenses essentielles mensuelles ({fmt_eur(essential)})"
 
     def safe_to_spend_inputs(self) -> SafeToSpendInputs:
         buffer, detail = self.default_buffer()

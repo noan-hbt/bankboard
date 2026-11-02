@@ -15,7 +15,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from bankboard.core.money import q
+from bankboard.core.money import fmt_eur, q
 from bankboard.engines.common import ExplainLine, Explanation
 
 Horizon = Literal["today", "week", "until_next_income", "month"]
@@ -96,20 +96,21 @@ def compute_safe_to_spend(inp: SafeToSpendInputs, horizon: Horizon) -> SafeToSpe
 
     lines: list[ExplainLine] = [
         ExplainLine(label="Solde des comptes de dépense", amount=q(inp.spending_cash), op="+",
-                    detail=", ".join(f"{n} {a}" for n, a in inp.cash_lines)),
+                    detail=", ".join(f"{n} {fmt_eur(a)}" for n, a in inp.cash_lines)),
         ExplainLine(label="Déjà engagé (factures, abonnements, loyer)", amount=obligations, op="-",
-                    detail="; ".join(f"{e.date:%d/%m} {e.label} {-e.amount}" for e in obligations_items[:8])
+                    detail="; ".join(f"{e.date:%d/%m} {e.label} {fmt_eur(-e.amount)}" for e in obligations_items[:8])
                     or None),
     ]
     if planned:
         lines.append(ExplainLine(label="Épargne & investissements planifiés", amount=planned, op="-",
-                                 detail="; ".join(f"{e.date:%d/%m} {e.label} {-e.amount}" for e in savings_items)))
+                                 detail="; ".join(f"{e.date:%d/%m} {e.label} {fmt_eur(-e.amount)}"
+                                                  for e in savings_items)))
     lines.append(ExplainLine(label="Buffer minimum", amount=q(inp.buffer), op="-", detail=inp.buffer_detail))
     if goals:
         lines.append(ExplainLine(label="Objectifs engagés (prorata)", amount=goals, op="-",
                                  detail=", ".join(g.name for g in inp.goals)))
     lines.append(ExplainLine(label="Dépenses essentielles prévues", amount=predicted, op="-",
-                             detail=f"{q(inp.daily_essential_variable)} €/jour × {days} j "
+                             detail=f"{fmt_eur(inp.daily_essential_variable)}/jour × {days} j "
                                     "(courses, carburant, santé… hors récurrents, moyenne 90 j)"))
     lines.append(ExplainLine(label="Safe to spend", amount=value, op="="))
 

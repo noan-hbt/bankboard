@@ -9,14 +9,14 @@ import polars as pl
 
 from bankboard.analytics.frames import between, spend_expr
 from bankboard.core.clock import utcnow
-from bankboard.core.money import from_cents, q
+from bankboard.core.money import fmt_eur, from_cents, q
 from bankboard.detectors.base import InsightDraft, priority_for
 from bankboard.engines.cashflow import compute_cashflow
 from bankboard.services.context import FinancialContext
 
 
 def _fmt(amount: Decimal) -> str:
-    return f"{q(amount):,.2f} €".replace(",", " ").replace(".", ",").replace(",00 €", " €")
+    return fmt_eur(amount).replace(",00 €", " €")
 
 
 def category_spike(ctx: FinancialContext) -> list[InsightDraft]:
@@ -54,7 +54,9 @@ def category_spike(ctx: FinancialContext) -> list[InsightDraft]:
         out.append(InsightDraft(
             type="category_spike", fingerprint=f"category_spike:{cat}:{t:%Y-%m}",
             title=f"{label} +{pct * 100:.0f} %", importance=round(importance, 3), confidence=confidence,
-            section="attention", priority=priority_for(importance, confidence),
+            # a spending trend is never "critical" on its own
+            section="attention", priority=min(priority_for(importance, confidence), "important",
+                                              key=["info", "useful", "important", "critical"].index),
             metrics={"category_key": cat, "current_30d": str(from_cents(cents)),
                      "baseline_monthly": str(from_cents(avg)), "delta": str(from_cents(delta)),
                      "delta_pct": round(pct, 4), "baseline_std": str(from_cents(std))},

@@ -1,0 +1,21 @@
+{
+  "name": "Bankboard — Personal Finance OS",
+  "short_name": "Bankboard",
+  "description": "Ton cockpit financier personnel",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121211",
+  "theme_color": "#121211",
+  "lang": "fr",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Ask your money", "url": "/ask" },
+    { "name": "Transactions", "url": "/transactions" }
+  ]
+}
