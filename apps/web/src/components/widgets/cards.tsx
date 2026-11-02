@@ -86,7 +86,7 @@ export function InsightList({ section, title }: { section: "attention" | "opport
                       href={`/transactions?category=${String(i.suggested_actions[0].filter.category)}`}>voir</a>) : null}
                 </div>
               </div>
-              <button aria-label="Ignorer" title="Ignorer" onClick={() => void ignore(i.id)} className="muted p-1">
+              <button aria-label="Ignorer" title="Ignorer" onClick={() => void ignore(i.id)} className="muted -m-1 p-2">
                 <EyeOff size={14} />
               </button>
             </li>
@@ -104,7 +104,7 @@ export function WhatChangedWidget() {
   return (
     <Panel title="Ce qui a changé" action={
       <select aria-label="Période" value={preset} onChange={(e) => setPreset(e.target.value)}
-        className="rounded border border-[var(--border)] bg-transparent px-1 py-0.5 text-xs">
+        className="rounded-md border border-[var(--border)] bg-transparent px-1.5 py-1 text-xs">
         <option value="yesterday">Depuis hier</option><option value="7d">7 jours</option>
         <option value="30d">30 jours</option><option value="mtd">Ce mois</option>
         <option value="since_salary">Depuis le salaire</option>
@@ -271,8 +271,8 @@ export function AskWidget() {
     <Panel title="Ask your money">
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Pourquoi ai-je dépensé plus ce mois-ci ?"
-          aria-label="Question" className="min-w-0 flex-1 rounded-md border border-[var(--border)] bg-transparent px-2 py-1.5 text-sm" />
-        <button disabled={busy} aria-label="Envoyer" className="rounded-md bg-[var(--accent)] px-3 text-white disabled:opacity-50"><Send size={14} /></button>
+          aria-label="Question" className="field flex-1" />
+        <button disabled={busy} aria-label="Envoyer" className="rounded-[10px] bg-[var(--accent)] px-3 text-white disabled:opacity-50"><Send size={14} /></button>
       </form>
       {answer && (
         <div className="mt-2 overflow-auto text-sm whitespace-pre-line">{answer.answer}

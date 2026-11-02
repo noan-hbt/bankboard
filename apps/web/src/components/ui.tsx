@@ -21,11 +21,13 @@ export function Panel({ title, action, children, className = "" }: {
   );
 }
 
-export function Stat({ label, value, sub, why }: { label: string; value: ReactNode; sub?: ReactNode; why?: Explanation }) {
+export function Stat({ label, value, sub, why, hero = false, className = "" }: {
+  label: string; value: ReactNode; sub?: ReactNode; why?: Explanation; hero?: boolean; className?: string;
+}) {
   return (
-    <div className="min-w-0">
+    <div className={`min-w-0 ${className}`}>
       <div className="label flex items-center gap-1">{label}{why && <Why explanation={why} title={label} />}</div>
-      <div className="num mt-0.5 truncate text-2xl font-semibold sm:text-[26px]">{value}</div>
+      <div className={`num mt-0.5 truncate font-semibold tracking-tight ${hero ? "text-4xl sm:text-[26px] sm:leading-8" : "text-xl sm:text-[26px] sm:leading-8"}`}>{value}</div>
       {sub && <div className="secondary mt-0.5 truncate text-xs">{sub}</div>}
     </div>
   );
@@ -43,17 +45,17 @@ export function Why({ explanation, title }: { explanation: Explanation; title: s
   return (
     <>
       <button aria-label={`Pourquoi : ${title}`} onClick={() => setOpen(true)}
-        className="muted rounded p-0.5 hover:text-[var(--text-primary)]">
+        className="muted -m-1.5 rounded p-1.5 hover:text-[var(--text-primary)]">
         <HelpCircle size={13} />
       </button>
       {open && createPortal(
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
           onClick={() => setOpen(false)} role="dialog" aria-modal="true" aria-label={`Pourquoi : ${title}`}>
-          <div className="panel safe-bottom w-full max-w-md rounded-b-none p-4 sm:rounded-b-[10px]"
+          <div className="panel safe-bottom max-h-[85vh] w-full max-w-md overflow-auto rounded-b-none p-4 sm:rounded-b-[14px]"
             onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="font-semibold">Pourquoi — {title}</h3>
-              <button aria-label="Fermer" onClick={() => setOpen(false)}><X size={16} /></button>
+              <button aria-label="Fermer" onClick={() => setOpen(false)} className="-m-2 p-2"><X size={16} /></button>
             </div>
             <table className="w-full text-sm">
               <tbody>

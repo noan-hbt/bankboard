@@ -47,7 +47,7 @@ function Settings() {
               <button onClick={() => confirm("Révoquer cette connexion ?") && void api(`/api/bank/connections/${c.id}`, { method: "DELETE" }).then(() => mConns())} className="rounded border border-[var(--border)] px-2 text-xs">Révoquer</button>
             </div>
           </div>))}
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button onClick={() => void connect("enable_banking")} className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm text-white">Connecter Revolut</button>
           <button onClick={() => void connect("demo")} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm">Données démo</button>
         </div>
@@ -62,12 +62,12 @@ function Settings() {
             </div>
           </div>))}
       </Panel>
-      <div className="min-h-64"><DataHealthWidget /></div>
+      <div className="stack"><DataHealthWidget /></div>
       <Panel title="Préférences">
         <label className="text-sm">Buffer minimum (€) — vide = calculé automatiquement
           <input type="number" min={0} defaultValue={prefs?.min_buffer ?? ""} key={prefs?.min_buffer ?? "auto"}
             onBlur={(e) => void api("/api/preferences", { method: "PUT", json: { min_buffer: e.target.value === "" ? null : e.target.value } }).then(() => mPrefs())}
-            className="mt-1 block w-40 rounded-md border border-[var(--border)] bg-transparent px-2 py-1" />
+            className="field mt-1 block w-40" />
         </label>
         <h3 className="label mt-4 mb-1">Modules</h3>
         {(mods ?? []).map((m) => (
@@ -76,7 +76,7 @@ function Settings() {
             <input type="checkbox" checked={m.enabled} onChange={(e) => void api("/api/preferences", { method: "PUT", json: { modules: { [m.key]: e.target.checked } } }).then(() => mMods())} />
           </label>))}
         <h3 className="label mt-4 mb-1">Données</h3>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button onClick={() => void api("/api/auth/logout", { method: "POST" }).then(() => { window.location.href = "/login"; })} className="rounded border border-[var(--border)] px-3 py-1 text-sm">Se déconnecter</button>
           <button onClick={() => confirm("Supprimer définitivement toutes tes données ?") && void api("/api/me", { method: "DELETE" }).then(() => { window.location.href = "/login"; })}
             className="rounded px-3 py-1 text-sm text-white" style={{ background: "var(--critical)" }}>Supprimer toutes mes données</button>
