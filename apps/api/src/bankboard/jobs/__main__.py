@@ -40,6 +40,8 @@ def sync_all() -> int:
             ok += 1
         except ProviderError as exc:
             log.warning("sync failed connection=%s kind=%s", cid, exc.kind)
+        except Exception:  # one broken connection must never stop the others
+            log.exception("sync crashed connection=%s", cid)
     with session_scope() as s:
         dispatch_pending(s)
     return ok
@@ -49,8 +51,11 @@ def snapshot_all() -> int:
     with session_scope() as s:
         ids = list(s.scalars(select(User.id)))
     for uid in ids:
-        with session_scope() as s:
-            refresh_user(s, uid, backfill_days=7)
+        try:
+            with session_scope() as s:
+                refresh_user(s, uid, backfill_days=7)
+        except Exception:
+            log.exception("snapshot failed user=%s", uid)
     return len(ids)
 
 
@@ -59,14 +64,17 @@ def scheduler() -> None:
     last_snapshot_day = None
     while True:
         now = datetime.now(UTC)
-        if now - last_sync >= SYNC_EVERY:
-            log.info("scheduled sync: %d connections", sync_all())
-            last_sync = now
-        if now.hour >= SNAPSHOT_HOUR_UTC and last_snapshot_day != now.date():
-            log.info("daily snapshot: %d users", snapshot_all())
-            last_snapshot_day = now.date()
-        with session_scope() as s:
-            dispatch_pending(s)
+        try:
+            if now - last_sync >= SYNC_EVERY:
+                last_sync = now
+                log.info("scheduled sync: %d connections", sync_all())
+            if now.hour >= SNAPSHOT_HOUR_UTC and last_snapshot_day != now.date():
+                last_snapshot_day = now.date()
+                log.info("daily snapshot: %d users", snapshot_all())
+            with session_scope() as s:
+                dispatch_pending(s)
+        except Exception:  # keep the scheduler alive; the next tick retries
+            log.exception("scheduler tick failed")
         time.sleep(60)
 
 

@@ -6,7 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -31,6 +31,29 @@ class Settings(BaseSettings):
     llm_provider: Literal["offline", "openrouter"] = "offline"
     openrouter_api_key: SecretStr = SecretStr("")
     openrouter_model: str = "anthropic/claude-opus-5.5"
+
+    # Injected automatically by Railway; used to infer URLs when they are not set explicitly.
+    railway_public_domain: str = ""
+    railway_environment_name: str = ""
+
+    @model_validator(mode="after")
+    def _platform_defaults(self) -> Settings:
+        explicit = self.model_fields_set
+        if self.railway_environment_name and "app_env" not in explicit:
+            self.app_env = "production"
+        if self.railway_public_domain:
+            public = f"https://{self.railway_public_domain}"
+            if "frontend_url" not in explicit:
+                self.frontend_url = public
+            if "app_base_url" not in explicit:
+                self.app_base_url = public
+            if "allowed_origins" not in explicit:
+                self.allowed_origins = [public]
+            if "enable_banking_redirect_url" not in explicit:
+                self.enable_banking_redirect_url = f"{public}/api/bank/callback"
+        if self.openrouter_api_key.get_secret_value() and "llm_provider" not in explicit:
+            self.llm_provider = "openrouter"
+        return self
 
     @field_validator("database_url", mode="before")
     @classmethod

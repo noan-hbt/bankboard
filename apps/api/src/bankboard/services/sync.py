@@ -11,13 +11,14 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
+from cryptography.fernet import InvalidToken
 from sqlalchemy import delete, func, select, text, true
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from bankboard.core.clock import today as clock_today
 from bankboard.core.clock import utcnow
-from bankboard.core.crypto import decrypt, iban_hash
+from bankboard.core.crypto import CryptoError, decrypt, iban_hash
 from bankboard.events.bus import publish
 from bankboard.models import (
     Account,
@@ -192,7 +193,10 @@ def sync_connection(
         ).first()
         if bank_session is None:
             raise ProviderError("consent_expired", "No active bank session")
-        ref = SessionRef(decrypt(bank_session.session_ref_enc))
+        try:
+            ref = SessionRef(decrypt(bank_session.session_ref_enc))
+        except (InvalidToken, CryptoError) as exc:  # encryption key changed or missing
+            raise ProviderError("auth", "Stored bank session cannot be decrypted; reconnect the bank") from exc
         provider = provider or get_provider(connection.provider)
 
         accounts = list(session.scalars(

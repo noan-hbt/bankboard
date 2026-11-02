@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import hmac
 import secrets
@@ -19,7 +21,13 @@ def _fernet() -> Fernet:
     key = get_settings().app_encryption_key.get_secret_value()
     if not key:
         raise CryptoError("APP_ENCRYPTION_KEY is not configured")
-    return Fernet(key.encode())
+    try:
+        return Fernet(key.encode())
+    except (ValueError, binascii.Error):
+        # Any long passphrase is accepted: derive a 32-byte Fernet key from it.
+        if len(key) < 32:
+            raise CryptoError("APP_ENCRYPTION_KEY must be a Fernet key or a passphrase of 32+ characters") from None
+        return Fernet(base64.urlsafe_b64encode(hashlib.sha256(key.encode()).digest()))
 
 
 def encrypt(value: str) -> str:

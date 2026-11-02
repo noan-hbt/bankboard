@@ -1,6 +1,35 @@
 # 05 — Déploiement Railway + PWA
 
-## Topologie
+## Option A — 1 service, détection automatique (recommandé)
+
+Le `Dockerfile` et le `railway.json` à la racine du repo sont détectés automatiquement par Railway.
+Une seule image lance les trois processus (`deploy/start.sh`) : le web Next.js (public, sur `$PORT`),
+l'API FastAPI (privée, `127.0.0.1:8000`) et le worker (sync toutes les 6 h, snapshot quotidien).
+Si l'un des trois s'arrête, le conteneur s'arrête et Railway le redémarre.
+
+1. *New Project* → *Deploy from GitHub repo* → `bankboard` (branche `main`). Aucun Root Directory à régler.
+2. Dans le projet : *New* → *Database* → *PostgreSQL*.
+3. Variables du service `bankboard` (onglet *Variables*) — seules 2 sont obligatoires :
+   ```
+   DATABASE_URL=${{Postgres.DATABASE_URL}}
+   APP_ENCRYPTION_KEY=<n'importe quelle chaîne aléatoire de 32+ caractères>
+   OPENROUTER_API_KEY=<ta clé>                 # optionnel : active automatiquement l'IA OpenRouter
+   ENABLE_BANKING_APP_ID=<app id>              # optionnel tant que tu utilises la démo
+   ENABLE_BANKING_PRIVATE_KEY=<PEM, \n échappés>
+   ```
+   ⚠ Ne change jamais `APP_ENCRYPTION_KEY` ensuite : les sessions bancaires stockées deviendraient illisibles
+   (la connexion passerait en « reconnexion nécessaire »).
+4. *Settings* → *Networking* → *Generate Domain*.
+
+Le reste est déduit automatiquement de `RAILWAY_PUBLIC_DOMAIN` : `FRONTEND_URL`, `APP_BASE_URL`,
+`ALLOWED_ORIGINS`, `ENABLE_BANKING_REDIRECT_URL` (`https://<domaine>/api/bank/callback`) et `APP_ENV=production`
+(cookie `Secure`). Les migrations s'exécutent à chaque démarrage. Toute valeur définie explicitement reste prioritaire.
+
+5. Enable Banking : ajouter `https://<domaine>/api/bank/callback` aux redirect URLs de l'application.
+
+## Option B — services séparés (si tu veux scaler indépendamment)
+
+### Topologie
 
 ```
                  Internet (HTTPS)
@@ -17,7 +46,7 @@
                 └─────────────┘
 ```
 
-## Étapes
+### Étapes
 
 1. **Projet Railway** → *New Project* → *Deploy from GitHub repo* (`bankboard`).
 2. **PostgreSQL** : *New* → *Database* → *PostgreSQL*.

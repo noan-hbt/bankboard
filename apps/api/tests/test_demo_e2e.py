@@ -61,3 +61,21 @@ def test_next_day_sync_turns_pending_into_booked(db: Session, user: User) -> Non
     stale = db.scalar(select(func.count()).select_from(Transaction).where(
         Transaction.status == "pending", Transaction.booking_date < date.fromordinal(tomorrow.toordinal() - 1)))
     assert pending_before is not None and stale == 0
+
+
+def test_undecryptable_session_marks_reauth(db: Session, user: User) -> None:
+    import pytest
+
+    from bankboard.models import BankSession
+    from bankboard.providers.base import ProviderError
+
+    connect_demo(db, user, today=TODAY)
+    db.commit()
+    bs = db.scalars(select(BankSession)).one()
+    bs.session_ref_enc = "not-a-valid-token"
+    db.commit()
+    conn = db.scalars(select(BankConnection)).one()
+    with pytest.raises(ProviderError):
+        sync_connection(db, conn.id, provider=DemoProvider(today=TODAY), today=TODAY)
+    db.refresh(conn)
+    assert conn.status == "reauth_required"
