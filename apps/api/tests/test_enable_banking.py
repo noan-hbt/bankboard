@@ -16,7 +16,7 @@ from bankboard.models import BankAuthRequest, User
 from bankboard.providers.base import DateRange, Institution, ProviderError, SessionRef
 from bankboard.providers.enable_banking.parsing import parse_transaction
 from bankboard.providers.enable_banking.provider import EnableBankingProvider
-from bankboard.services.bank_connections import AuthorizationError, complete_connection
+from bankboard.services.bank_connections import AuthorizationError, complete_connection, start_connection
 
 KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 PEM = KEY.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
@@ -93,6 +93,7 @@ def test_transactions_pagination_and_parsing() -> None:
 
 @pytest.mark.parametrize(("code", "body", "kind"), [
     (401, {}, "auth"), (403, {}, "consent_expired"), (400, {"error": "EXPIRED_SESSION"}, "consent_expired"),
+    (403, {"error": "ACCESS_DENIED"}, "access_denied"),
     (429, {}, "rate_limited"), (503, {}, "unavailable"), (422, {}, "invalid"),
 ])
 def test_error_mapping(code: int, body: dict[str, str], kind: str) -> None:
@@ -100,6 +101,36 @@ def test_error_mapping(code: int, body: dict[str, str], kind: str) -> None:
     with pytest.raises(ProviderError) as exc:
         p.get_balances(SessionRef("s"), "u1")
     assert exc.value.kind == kind
+
+
+@pytest.mark.parametrize("body", [{}, {"error": "NO_ACCOUNTS_ADDED", "message": "No allowed accounts added"}])
+def test_403_on_auth_is_not_a_consent_error(body: dict[str, str]) -> None:
+    """No consent exists yet when starting an authorization: a 403 there is an application refusal."""
+    p = provider(lambda req: httpx.Response(403, json=body))
+    with pytest.raises(ProviderError) as exc:
+        p.start_authorization(Institution("Revolut", "FR"), state="s", redirect_url="https://x/cb",
+                              valid_until=datetime.now(UTC) + timedelta(days=90))
+    assert exc.value.kind == "access_denied"
+    if body:
+        assert exc.value.code == "NO_ACCOUNTS_ADDED" and "No allowed accounts added" in str(exc.value)
+
+
+def test_start_connection_uses_catalog_name_and_consent_limit(db: Session, user: User) -> None:
+    sent: dict[str, object] = {}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url.path == "/aspsps":
+            return httpx.Response(200, json={"aspsps": [
+                {"name": "Revolut", "country": "FR", "maximum_consent_validity": 90 * 86400}]})
+        sent.update(json.loads(req.content))
+        return httpx.Response(200, json={"url": "https://bank/auth", "authorization_id": "a1"})
+
+    url = start_connection(db, user_id=user.id, provider_key="enable_banking", institution_name="revolut",
+                           institution_country="fr", redirect_url="https://x/cb", provider=provider(handler))
+    assert url == "https://bank/auth"
+    assert sent["aspsp"] == {"name": "Revolut", "country": "FR"}
+    valid_until = datetime.fromisoformat(sent["access"]["valid_until"])  # type: ignore[index]
+    assert valid_until <= datetime.now(UTC) + timedelta(days=90, minutes=1)
 
 
 def test_parse_transaction_requires_a_date() -> None:

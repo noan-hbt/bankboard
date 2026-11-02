@@ -28,6 +28,31 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/bank", tags=["bank"])
 
 
+_HINTS: dict[str, str] = {
+    "access_denied": (
+        "Enable Banking refuse la demande pour cette application. En production, l'application est en "
+        "mode restreint tant que tes propres comptes ne sont pas liés : dans le Control Panel Enable Banking, "
+        "ouvre l'application et utilise « Link accounts » avec ton compte Revolut, puis réessaie. "
+        "Une application sandbox ne donne accès qu'aux banques de test (Mock ASPSP), pas au vrai Revolut."
+    ),
+    "auth": ("Authentification Enable Banking refusée : vérifie ENABLE_BANKING_APP_ID et la clé privée "
+             "(elles doivent correspondre à la même application)."),
+    "config": "Enable Banking n'est pas configuré (ENABLE_BANKING_APP_ID et clé privée manquants).",
+    "consent_expired": "Le consentement bancaire a expiré ou a été révoqué : reconnecte la banque.",
+    "rate_limited": "Trop de requêtes vers Enable Banking : réessaie dans quelques minutes.",
+    "unavailable": "Enable Banking ou la banque est indisponible pour le moment : réessaie plus tard.",
+    "invalid": "Enable Banking a rejeté la demande.",
+}
+
+
+def provider_error_detail(exc: ProviderError) -> str:
+    """User-facing explanation; includes the provider's error code/message (never secrets)."""
+    hint = _HINTS.get(exc.kind, "Erreur du fournisseur bancaire.")
+    if exc.code == "WRONG_ASPSP_PROVIDED":
+        hint = "Cette banque n'est pas proposée par Enable Banking pour ce pays (ou pas pour cette application)."
+    return f"{hint} [{exc.kind}: {exc}]"
+
+
 def _redirect_url(provider: str) -> str:
     s = get_settings()
     if provider == "enable_banking":
@@ -61,7 +86,7 @@ def institutions(user: CurrentUser, provider: str = "enable_banking", country: s
     try:
         items = get_provider(provider).list_institutions(country)
     except ProviderError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Provider error ({exc.kind})") from exc
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, provider_error_detail(exc)) from exc
     return {"institutions": [{"name": i.name, "country": i.country, "logo": i.logo} for i in items]}
 
 
@@ -73,7 +98,7 @@ def connect(body: ConnectIn, user: CurrentUser, db: DB) -> dict[str, str]:
                                institution_country=body.institution_country,
                                redirect_url=_redirect_url(body.provider))
     except ProviderError as exc:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Provider error ({exc.kind})") from exc
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, provider_error_detail(exc)) from exc
     return {"url": url}
 
 

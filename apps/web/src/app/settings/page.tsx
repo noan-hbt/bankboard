@@ -1,7 +1,7 @@
 "use client";
 import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { DataHealthWidget } from "@/components/widgets/cards";
 import { Panel } from "@/components/ui";
@@ -20,11 +20,19 @@ function Settings() {
   const { data: mods, mutate: mMods } = useApi<Mod[]>("/api/modules");
   const { data: prefs, mutate: mPrefs } = useApi<Prefs>("/api/preferences");
   const bank = params.get("bank");
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState<string | null>(null);
 
   const connect = async (provider: string) => {
-    const { url } = await api<{ url: string }>("/api/bank/connect", { method: "POST",
-      json: { provider, institution_name: provider === "demo" ? "Revolut (démo)" : "Revolut", institution_country: "FR" } });
-    window.location.href = url;
+    setConnectError(null); setConnecting(provider);
+    try {
+      const { url } = await api<{ url: string }>("/api/bank/connect", { method: "POST",
+        json: { provider, institution_name: provider === "demo" ? "Revolut (démo)" : "Revolut", institution_country: "FR" } });
+      window.location.href = url;
+    } catch (e) {
+      setConnectError((e as Error).message);
+      setConnecting(null);
+    }
   };
   const patchAccount = async (id: string, body: Partial<Acc>) => {
     await api(`/api/accounts/${id}`, { method: "PATCH", json: body }); await mAccs();
@@ -48,9 +56,15 @@ function Settings() {
             </div>
           </div>))}
         <div className="mt-3 flex flex-wrap gap-2">
-          <button onClick={() => void connect("enable_banking")} className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm text-white">Connecter Revolut</button>
-          <button onClick={() => void connect("demo")} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm">Données démo</button>
+          <button disabled={!!connecting} onClick={() => void connect("enable_banking")} className="rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm text-white disabled:opacity-50">
+            {connecting === "enable_banking" ? "Redirection…" : "Connecter Revolut"}</button>
+          <button disabled={!!connecting} onClick={() => void connect("demo")} className="rounded-md border border-[var(--border)] px-3 py-1.5 text-sm disabled:opacity-50">Données démo</button>
         </div>
+        {connectError && (
+          <p role="alert" className="mt-3 rounded-md border px-3 py-2 text-xs leading-relaxed"
+            style={{ borderColor: "var(--critical)", color: "var(--text-primary)" }}>
+            <span style={{ color: "var(--critical)" }}>▲ Connexion impossible.</span> {connectError}
+          </p>)}
       </Panel>
       <Panel title="Comptes">
         {(accs ?? []).map((a) => (

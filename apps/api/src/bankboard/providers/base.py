@@ -12,14 +12,20 @@ from decimal import Decimal
 from typing import Any, ClassVar, Literal, Protocol, runtime_checkable
 
 TransactionStatus = Literal["booked", "pending"]
-ProviderErrorKind = Literal["auth", "consent_expired", "rate_limited", "unavailable", "invalid", "config"]
+ProviderErrorKind = Literal[
+    "auth", "consent_expired", "access_denied", "rate_limited", "unavailable", "invalid", "config",
+]
 
 
 class ProviderError(RuntimeError):
-    def __init__(self, kind: ProviderErrorKind, message: str, *, status_code: int | None = None) -> None:
+    """`code` is the provider's own error code (e.g. ACCESS_DENIED): safe to log and show, never a secret."""
+
+    def __init__(self, kind: ProviderErrorKind, message: str, *, status_code: int | None = None,
+                 code: str | None = None) -> None:
         super().__init__(message)
         self.kind = kind
         self.status_code = status_code
+        self.code = code
 
 
 @dataclass(frozen=True)

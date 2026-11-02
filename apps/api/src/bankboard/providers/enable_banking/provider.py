@@ -30,6 +30,11 @@ log = logging.getLogger(__name__)
 
 MAX_PAGES = 200
 
+# Enable Banking ErrorCode values meaning the session/consent itself is gone -> user must reconnect.
+SESSION_GONE = {"EXPIRED_SESSION", "REVOKED_SESSION", "CLOSED_SESSION", "SESSION_DOES_NOT_EXIST"}
+# Application-level refusals: the app is not allowed to do this (not activated, restricted mode...).
+ACCESS_REFUSED = {"ACCESS_DENIED", "NO_ACCOUNTS_ADDED", "UNAUTHORIZED_ACCESS"}
+
 
 class EnableBankingProvider:
     key: ClassVar[str] = "enable_banking"
@@ -63,30 +68,51 @@ class EnableBankingProvider:
         except httpx.HTTPError as exc:
             raise ProviderError("unavailable", f"Enable Banking unreachable: {type(exc).__name__}") from exc
         if response.status_code >= 400:
-            raise self._error(response)
+            raise self._error(response, path)
         if not response.content:
             return {}
         data = response.json()
         return data if isinstance(data, dict) else {"items": data}
 
     @staticmethod
-    def _error(response: httpx.Response) -> ProviderError:
-        code = response.status_code
+    def _error(response: httpx.Response, path: str = "") -> ProviderError:
+        """Map an Enable Banking ErrorResponse ({message, code, error, detail}) to a ProviderError.
+
+        A 403 is only a consent problem when it concerns an existing session; on /auth or /aspsps it
+        means the application itself is refused (e.g. production app in restricted mode).
+        """
+        status_code = response.status_code
+        error_code = ""
+        message = ""
         try:
             body = response.json()
-            detail = str(body.get("error") or body.get("message") or "")
+            if isinstance(body, dict):
+                error_code = str(body.get("error") or "").upper()
+                message = str(body.get("message") or "")
         except ValueError:
-            detail = ""
-        log.warning("enable_banking error status=%s error=%s", code, detail[:80])
-        if code == 401:
-            return ProviderError("auth", "Enable Banking authentication failed", status_code=code)
-        if code == 403 or detail.upper() in {"EXPIRED_SESSION", "REVOKED_SESSION", "CLOSED_SESSION"}:
-            return ProviderError("consent_expired", "Bank consent expired or revoked", status_code=code)
-        if code == 429:
-            return ProviderError("rate_limited", "Enable Banking rate limit reached", status_code=code)
-        if code >= 500:
-            return ProviderError("unavailable", "Enable Banking unavailable", status_code=code)
-        return ProviderError("invalid", f"Enable Banking rejected the request ({code})", status_code=code)
+            pass
+        log.warning("enable_banking error status=%s path=%s error=%s message=%s",
+                    status_code, path.split("/")[1] if "/" in path else path, error_code[:40], message[:160])
+        suffix = f" ({error_code}{': ' + message[:160] if message else ''})" if error_code or message else ""
+        code = error_code or None
+        session_scoped = path.startswith(("/sessions/", "/accounts/"))
+        if status_code == 401:
+            return ProviderError("auth", f"Enable Banking authentication failed{suffix}",
+                                 status_code=status_code, code=code)
+        if error_code in SESSION_GONE or (status_code == 403 and session_scoped and error_code not in ACCESS_REFUSED):
+            return ProviderError("consent_expired", f"Bank consent expired or revoked{suffix}",
+                                 status_code=status_code, code=code)
+        if status_code == 403 or error_code in ACCESS_REFUSED:
+            return ProviderError("access_denied", f"Enable Banking refused the request{suffix}",
+                                 status_code=status_code, code=code)
+        if status_code == 429:
+            return ProviderError("rate_limited", f"Enable Banking rate limit reached{suffix}",
+                                 status_code=status_code, code=code)
+        if status_code >= 500:
+            return ProviderError("unavailable", f"Enable Banking unavailable{suffix}",
+                                 status_code=status_code, code=code)
+        return ProviderError("invalid", f"Enable Banking rejected the request ({status_code}){suffix}",
+                             status_code=status_code, code=code)
 
     # -- BankingProvider ------------------------------------------------------
     def list_institutions(self, country: str) -> list[Institution]:
