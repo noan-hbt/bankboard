@@ -12,9 +12,10 @@ function NowStrip({ cc }: { cc: CommandCenter }) {
   const n = cc.now;
   const next = cc.next.next_income;
   return (
-    <section aria-label="Maintenant" className="panel grid grid-cols-2 gap-4 p-4 md:grid-cols-3 lg:grid-cols-6">
-      <Stat label="Safe to spend" value={eur(n.safe_to_spend.value)} why={n.safe_to_spend.explanation}
-        sub={`jusqu'au ${shortDate(n.safe_to_spend.end_date)}`} />
+    <section aria-label="Maintenant" className="panel grid grid-cols-2 gap-x-4 gap-y-4 p-4 md:grid-cols-3 lg:grid-cols-6">
+      <Stat hero label="Safe to spend" value={eur(n.safe_to_spend.value)} why={n.safe_to_spend.explanation}
+        sub={`jusqu'au ${shortDate(n.safe_to_spend.end_date)}`}
+        className="col-span-2 border-b border-[var(--border)] pb-4 md:col-span-1 md:border-0 md:pb-0" />
       <Stat label="Cash dispo" value={eur(n.spending_cash)} sub={`liquidités ${eur(n.liquid_assets)}`} />
       <Stat label="Patrimoine net" value={eur(n.net_worth)} sub="comptes suivis" />
       <Stat label="Cashflow 30 j" value={signedEur(n.cashflow_30d.net)}
@@ -37,13 +38,13 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     } catch (e) { setBusy(null); alert((e as Error).message); onDone(); }
   };
   return (
-    <div className="panel mx-auto mt-10 max-w-md p-6 text-center">
+    <div className="panel mx-auto mt-6 max-w-md p-6 text-center sm:mt-10">
       <h1 className="text-lg font-semibold">Connecte ta banque</h1>
       <p className="secondary mt-1 text-sm">Lecture seule via Enable Banking (PSD2). Aucun mouvement d&apos;argent n&apos;est jamais effectué.</p>
       <div className="mt-4 flex flex-col gap-2">
-        <button disabled={!!busy} onClick={() => void connect("enable_banking")} className="rounded-md bg-[var(--accent)] py-2 text-white disabled:opacity-50">
+        <button disabled={!!busy} onClick={() => void connect("enable_banking")} className="rounded-[10px] bg-[var(--accent)] py-2.5 font-medium text-white disabled:opacity-50">
           {busy === "enable_banking" ? "Redirection…" : "Connecter Revolut"}</button>
-        <button disabled={!!busy} onClick={() => void connect("demo")} className="rounded-md border border-[var(--border)] py-2 disabled:opacity-50">
+        <button disabled={!!busy} onClick={() => void connect("demo")} className="rounded-[10px] border border-[var(--border)] py-2.5 disabled:opacity-50">
           {busy === "demo" ? "Préparation…" : "Essayer avec 12 mois de démo"}</button>
       </div>
     </div>
@@ -59,8 +60,8 @@ function CommandCenterPage() {
       {!data ? <div className="h-28"><Skeleton /></div> : !data.has_data ? <Onboarding onDone={() => void mutate()} /> : (
         <>
           <NowStrip cc={data} />
-          <div className="my-3 flex items-center gap-3">
-            <p className="text-sm secondary">{data.what_changed.headline}</p>
+          <div className="my-3 flex items-center gap-3 px-1">
+            <p className="text-sm leading-snug secondary">{data.what_changed.headline}</p>
             {data.data_confidence < 0.8 && <span className="text-xs" style={{ color: "var(--serious)" }}>● données incomplètes</span>}
             <button onClick={() => setEditing(!editing)} aria-pressed={editing}
               className="muted ml-auto hidden items-center gap-1 rounded border border-[var(--border)] px-2 py-1 text-xs md:flex">

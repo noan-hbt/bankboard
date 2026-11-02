@@ -7,11 +7,26 @@ import { api, type LayoutItem, type WidgetDef, useApi } from "@/lib/api";
 
 const Grid = WidthProvider(Responsive);
 const ROW = 60;
+const MOBILE = "(max-width: 699px)";
+
+/** Below the grid's "md" breakpoint, widgets are stacked with their natural height. */
+function useIsMobile(): boolean {
+  const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE);
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return mobile;
+}
 
 export function DashboardGrid({ editing }: { editing: boolean }) {
   const { data: catalog } = useApi<WidgetDef[]>("/api/widgets");
   const { data: saved, mutate } = useApi<{ items: LayoutItem[] }>("/api/dashboard/layout");
   const [items, setItems] = useState<LayoutItem[]>([]);
+  const mobile = useIsMobile();
   useEffect(() => { if (saved) setItems(saved.items); }, [saved]);
 
   const available = useMemo(() => new Set((catalog ?? []).map((w) => w.id)), [catalog]);
@@ -58,6 +73,14 @@ export function DashboardGrid({ editing }: { editing: boolean }) {
             className="ml-auto flex items-center gap-1 rounded px-2 py-1 secondary"><RotateCcw size={12} />Réinitialiser</button>
         </div>
       )}
+      {mobile && !editing ? (
+        <div className="stack flex flex-col gap-3">
+          {[...visible].sort((a, b) => a.y - b.y || a.x - b.x).map((it) => {
+            const W = WIDGETS[it.widget]!;
+            return <div key={it.i}><W /></div>;
+          })}
+        </div>
+      ) : (
       <Grid
         className="-mx-[5px]"
         layouts={{ lg: visible.map((i) => ({ i: i.i, x: i.x, y: i.y, w: i.w, h: i.h, minW: 2, minH: 2 })) }}
@@ -75,7 +98,7 @@ export function DashboardGrid({ editing }: { editing: boolean }) {
           return (
             <div key={it.i} className="relative">
               {editing && (
-                <div className="drag-handle absolute inset-x-0 top-0 z-10 flex cursor-move justify-end gap-1 rounded-t-[10px] bg-[var(--surface-2)]/80 p-1 text-xs">
+                <div className="drag-handle absolute inset-x-0 top-0 z-10 flex cursor-move justify-end gap-1 rounded-t-[14px] bg-[var(--surface-2)]/80 p-1 text-xs">
                   <button onClick={() => duplicate(it)} className="rounded px-1.5" aria-label="Dupliquer">⧉</button>
                   <button onClick={() => void persist(items.map((i) => (i.i === it.i ? { ...i, hidden: true } : i)))}
                     className="rounded px-1.5" aria-label="Masquer"><EyeOff size={12} /></button>
@@ -84,6 +107,7 @@ export function DashboardGrid({ editing }: { editing: boolean }) {
             </div>);
         })}
       </Grid>
+      )}
       {editing && items.some((i) => i.hidden) && (
         <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
           {items.filter((i) => i.hidden).map((i) => (

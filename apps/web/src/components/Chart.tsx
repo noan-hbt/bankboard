@@ -47,7 +47,7 @@ export function baseOption(t: Tokens): echarts.EChartsCoreOption {
   };
 }
 
-export function Chart({ option, label, height = "100%" }: {
+export function Chart({ option, label, height }: {
   option: echarts.EChartsCoreOption; label: string; height?: string | number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -60,5 +60,5 @@ export function Chart({ option, label, height = "100%" }: {
     return () => { ro.disconnect(); inst.current?.dispose(); inst.current = null; };
   }, []);
   useEffect(() => { inst.current?.setOption(option, true); }, [option]);
-  return <div ref={ref} role="img" aria-label={label} style={{ width: "100%", height, minHeight: 120 }} />;
+  return <div ref={ref} role="img" aria-label={label} className="chart-box" style={height !== undefined ? { height } : undefined} />;
 }
