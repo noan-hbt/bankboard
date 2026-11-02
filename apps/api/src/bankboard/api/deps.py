@@ -27,6 +27,13 @@ def current_user(db: DB, bb_session: Annotated[str | None, Cookie()] = None) -> 
 CurrentUser = Annotated[User, Depends(current_user)]
 
 
+def optional_user(db: DB, bb_session: Annotated[str | None, Cookie()] = None) -> User | None:
+    return user_for_token(db, bb_session)
+
+
+OptionalUser = Annotated[User | None, Depends(optional_user)]
+
+
 def today_dep() -> date:
     return today()
 

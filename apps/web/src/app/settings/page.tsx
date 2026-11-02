@@ -1,7 +1,7 @@
 "use client";
 import { RefreshCw } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { DataHealthWidget } from "@/components/widgets/cards";
 import { Panel } from "@/components/ui";
@@ -22,6 +22,17 @@ function Settings() {
   const bank = params.get("bank");
   const [connectError, setConnectError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState<string | null>(null);
+  // Back from the bank (on iOS the bank flow ends in Safari, outside the installed app): reset and refresh.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      setConnecting(null);
+      void mConns(); void mAccs();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    return () => { document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("pageshow", onVisible); };
+  }, [mConns, mAccs]);
 
   const connect = async (provider: string) => {
     setConnectError(null); setConnecting(provider);

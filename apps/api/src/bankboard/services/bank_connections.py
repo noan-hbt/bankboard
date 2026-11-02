@@ -70,10 +70,17 @@ def start_connection(
 
 
 def complete_connection(
-    session: Session, *, user_id: uuid.UUID, code: str, state: str,
+    session: Session, *, user_id: uuid.UUID | None, code: str, state: str,
     provider: BankingProvider | None = None,
 ) -> BankConnection:
-    """Validate the callback state, exchange the code and persist the connection."""
+    """Validate the callback state, exchange the code and persist the connection.
+
+    The state (256-bit, single use, 15 min TTL, bound to the user who started the flow) identifies the
+    user. `user_id` is the browser's session user when there is one: it must then be the same user, so
+    a callback can't attach a bank to someone else's account in a logged-in browser. It is None when
+    the bank redirects to a browser without our cookie (e.g. iOS opens Safari outside the installed PWA,
+    which has its own cookie jar).
+    """
     if not code or not state or len(state) > 256:
         raise AuthorizationError("Missing code or state")
     request = session.scalars(
@@ -81,8 +88,9 @@ def complete_connection(
         .with_for_update()
     ).first()
     now = utcnow()
-    if request is None or request.user_id != user_id:
+    if request is None or (user_id is not None and request.user_id != user_id):
         raise AuthorizationError("Unknown authorization state")
+    user_id = request.user_id
     if request.consumed_at is not None:
         raise AuthorizationError("Authorization state already used")
     if request.expires_at < now:

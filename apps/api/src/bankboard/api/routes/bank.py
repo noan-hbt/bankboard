@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import logging
 import uuid
+from html import escape
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 
-from bankboard.api.deps import DB, CurrentUser
+from bankboard.api.deps import DB, CurrentUser, OptionalUser
 from bankboard.api.schemas import ConnectIn, ConnectionOut
 from bankboard.core.config import get_settings
 from bankboard.core.db import session_scope
@@ -102,22 +103,57 @@ def connect(body: ConnectIn, user: CurrentUser, db: DB) -> dict[str, str]:
     return {"url": url}
 
 
-@router.get("/callback")
-def callback(user: CurrentUser, db: DB, background: BackgroundTasks,
+_RESULT_PAGES = {
+    "connected": ("Banque connectée", "La synchronisation a démarré. Tu peux fermer cette page et revenir dans "
+                  "l'app bankboard : tes comptes vont apparaître dans quelques instants."),
+    "invalid": ("Lien expiré ou déjà utilisé", "Relance la connexion depuis l'app bankboard (Réglages)."),
+    "error": ("Connexion annulée", "La banque n'a pas confirmé l'autorisation. Relance la connexion depuis "
+              "l'app bankboard (Réglages)."),
+}
+
+
+def _result_page(result: str) -> HTMLResponse:
+    """Shown when the bank returns to a browser without our session (e.g. Safari outside the iOS PWA)."""
+    title, text = _RESULT_PAGES[result]
+    ok = result == "connected"
+    front = escape(get_settings().frontend_url.rstrip("/"))
+    html = f"""<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{escape(title)} · bankboard</title>
+<style>:root{{color-scheme:light dark;--bg:#f4f4f2;--card:#fcfcfb;--b:#e2e1dc;--t:#0b0b0b;--m:#52514e}}
+@media(prefers-color-scheme:dark){{:root{{--bg:#121211;--card:#1a1a19;--b:#2e2e2b;--t:#f0efec;--m:#c3c2b7}}}}
+body{{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--t);
+font:16px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif;padding:16px;box-sizing:border-box}}
+.c{{background:var(--card);border:1px solid var(--b);border-radius:14px;padding:28px 24px;max-width:380px;
+text-align:center}}.i{{font-size:28px;color:{"#0ca30c" if ok else "#d03b3b"}}}h1{{font-size:20px;margin:8px 0}}
+p{{color:var(--m);margin:0 0 16px}}
+a{{color:#2a78d6}}</style></head><body><main class="c"><div class="i" aria-hidden="true">{"✓" if ok else "▲"}</div>
+<h1>{escape(title)}</h1><p>{escape(text)}</p><a href="{front}/settings">Ouvrir bankboard dans ce navigateur</a>
+</main></body></html>"""
+    return HTMLResponse(html, headers={"cache-control": "no-store", "referrer-policy": "no-referrer"})
+
+
+@router.get("/callback", response_model=None)
+def callback(user: OptionalUser, db: DB, background: BackgroundTasks,
              code: Annotated[str | None, Query(max_length=2048)] = None,
              state: Annotated[str | None, Query(max_length=256)] = None,
-             error: Annotated[str | None, Query(max_length=200)] = None) -> RedirectResponse:
+             error: Annotated[str | None, Query(max_length=200)] = None) -> RedirectResponse | HTMLResponse:
     front = get_settings().frontend_url.rstrip("/")
+
+    def done(result: str) -> RedirectResponse | HTMLResponse:
+        if user is None:
+            return _result_page(result)
+        return RedirectResponse(f"{front}/settings?bank={result}", status_code=303)
+
     if error or not code or not state:
-        return RedirectResponse(f"{front}/settings?bank=error", status_code=303)
+        return done("error")
     try:
-        connection = complete_connection(db, user_id=user.id, code=code, state=state)
+        connection = complete_connection(db, user_id=user.id if user else None, code=code, state=state)
     except AuthorizationError:
         db.commit()  # persist the consumed state
-        return RedirectResponse(f"{front}/settings?bank=invalid", status_code=303)
+        return done("invalid")
     db.commit()
     background.add_task(run_sync_job, connection.id)
-    return RedirectResponse(f"{front}/settings?bank=connected", status_code=303)
+    return done("connected")
 
 
 @router.get("/connections", response_model=list[ConnectionOut])

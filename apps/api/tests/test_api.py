@@ -99,3 +99,41 @@ def test_user_isolation_and_delete(demo_client: TestClient, db: Session) -> None
     assert other.get("/api/transactions").json()["total"] == 0
     assert demo_client.delete("/api/me", headers=ORIGIN).status_code == 204
     assert db.scalars(select(User).where(User.email == "me@test.local")).first() is None
+
+
+def _start_demo_connect(client: TestClient) -> str:
+    r = client.post("/api/bank/connect", json={"provider": "demo", "institution_name": "Revolut (démo)",
+                                               "institution_country": "FR"}, headers=ORIGIN)
+    assert r.status_code == 200, r.text
+    url: str = r.json()["url"]
+    return url[url.index("/api/bank/callback"):]
+
+
+def test_bank_callback_without_session_cookie(client: TestClient, db: Session) -> None:
+    """iOS opens the bank redirect in Safari, outside the installed PWA and its cookies."""
+    register(client)
+    callback = _start_demo_connect(client)
+    with TestClient(app) as safari:  # fresh cookie jar
+        r = safari.get(callback, follow_redirects=False)
+        assert r.status_code == 200 and "Banque connectée" in r.text
+        again = safari.get(callback, follow_redirects=False)  # state is single use
+        assert again.status_code == 200 and "déjà utilisé" in again.text
+    conns = client.get("/api/bank/connections").json()
+    assert len(conns) == 1 and conns[0]["provider"] == "demo"
+
+
+def test_bank_callback_rejects_other_logged_in_user(client: TestClient) -> None:
+    register(client)
+    callback = _start_demo_connect(client)
+    with TestClient(app) as other:
+        register(other, "other@test.local")
+        r = other.get(callback, follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"].endswith("/settings?bank=invalid")
+        assert other.get("/api/bank/connections").json() == []
+    assert client.get("/api/bank/connections").json() == []
+
+
+def test_bank_callback_logged_in_redirects(client: TestClient) -> None:
+    register(client)
+    r = client.get(_start_demo_connect(client), follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"].endswith("/settings?bank=connected")
